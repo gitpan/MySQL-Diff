@@ -58,7 +58,7 @@ sub parse {
         if $self->indices($key);
       $self->indices_push($key, $val);
       my $unique = $type =~ /unique/i;
-      $self->unique_index($key, $unique);
+      $self->unique_index_push($key, $unique);
       debug(6, "          got ",
                $unique ? 'unique ' : '',
                "index key `$key': ($val)\n");
@@ -94,6 +94,9 @@ sub parse {
 
   warn "table `$name' didn't have terminator\n"
     unless defined $self->options;
+
+  @lines = grep ! m{^/\*!40000 ALTER TABLE \Q$name\E DISABLE KEYS \*/;},
+                @lines;
 
   warn "table `$name' had trailing garbage:\n", join '', @lines
     if @lines;
