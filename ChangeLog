@@ -1,3 +1,33 @@
+2003-05-08  adams  <adams@yoda>
+
+	* README: document bugs
+
+	* Diff.pm, Makefile.PL, README, Utils.pm:
+	- 0.33
+	- remove Perl 5.6 requirement (thanks to Tatsuhiko Miyagawa
+	  for the suggestion)
+
+	* t/all.t, test.pl, MANIFEST: renamed test.pl to t/all.t to use
+	Test::Harness
+
+	* INSTALL: Make stuff more obvious
+
+	* test.pl: don't hang when mysqld up
+
+	* test.pl: more obvious on failure
+
+	* README: Class::MakeMethods
+
+2002-09-10  Adam Spiers  <mysqldiff@adamspiers.org>
+
+	* MANIFEST: mysqldiff.pl -> mysqldiff
+
+	* Diff.pm: version 0.32
+
+	* Diff.pm, Table.pm, test.pl:
+	Fix bug with INDEX <-> UNIQUE, spotted by John Smith.  Thanks John!
+	Added regression tests.
+
 2002-09-10  Adam Spiers  <mysqldiff@adamspiers.org>
 
 	* Diff.pm: version 0.32
