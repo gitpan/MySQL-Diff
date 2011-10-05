@@ -12,55 +12,46 @@
 # See http://adamspiers.org/computing/mysqldiff/ for the
 # latest version.
 #
-# Copyright (c) 2000 Adam Spiers <adam@spiers.net>. All rights
-# reserved. This program is free software; you can redistribute it
-# and/or modify it under the same terms as Perl itself.
+# Copyright (c) 2000-2011 Adam Spiers. All rights reserved. This
+# program is free software; you can redistribute it and/or modify it
+# under the same terms as Perl itself.
 #
 
 use strict;
 
-require 5.004;
+require 5.005003; #due to qr
 
-use Carp qw(:DEFAULT cluck);
 use FindBin qw($RealBin $Script);
 use lib $RealBin;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
+use IO::File;
 
-use MySQL::Diff qw(parse_arg diff_dbs);
-use MySQL::Utils qw(debug_level);
+use MySQL::Diff;
 
 my %opts = ();
 GetOptions(\%opts, "help|?", "debug|d:i", "apply|A", "batch-apply|B",
            "keep-old-tables|k", "no-old-defs|n", "only-both|o", "table-re|t=s",
-           "host|h=s",   "port|P=s", "user|u=s",   "password|p:s",
-           "host1|h1=s", "port1|P1=s", "user1|u1=s", "password1|p1:s",
-           "host2|h2=s", "port2|P2=s", "user2|u2=s", "password2|p2:s",
-           "socket|s=s", "socket1|s1=s", "socket2|s2=s",
+           "host|h=s", "port|P=s", "socket|s=s", "user|u=s", "password|p:s",
+           "host1=s",  "port1=s",  "socket1=s",  "user1=s",  "password1:s",
+           "host2=s",  "port2=s",  "socket2=s",  "user2=s",  "password2:s",
            "tolerant|i"
-          );
+          ) or usage();
 
-if (@ARGV != 2 or $opts{help}) {
-  usage();
-  exit 1;
-}
+usage() if (@ARGV != 2 or $opts{help});
 
-$opts{debug}++ if exists $opts{debug} && $opts{debug} == 0;
-debug_level($opts{debug} || 0);
+$opts{debug} ||= 0;
 
-my $table_re;
-$table_re = qr/$opts{'table-re'}/ if $opts{'table-re'};
+my $md = MySQL::Diff->new(%opts);
 
-my @db = ();
-for my $num (0, 1) {
-  my $new_db = parse_arg(\%opts, $ARGV[$num], $num);
+for my $num (1, 2) {
+  my $new_db = $md->register_db($ARGV[$num-1], $num);
   usage($new_db) unless ref $new_db;
-  $db[$num] = $new_db;
 }
 
 $| = 1;
-my $diffs = diff_dbs(\%opts, @db);
+my $diffs = $md->diff();
 print $diffs;
-apply($diffs) if $opts{apply} || $opts{'batch-apply'};
+apply($md, $diffs) if $opts{apply} || $opts{'batch-apply'};
 
 exit 0;
 
@@ -80,7 +71,7 @@ Options:
   -k,  --keep-old-tables  don't output DROP TABLE commands
   -n,  --no-old-defs      suppress comments describing old definitions
   -t,  --table-re=REGEXP  restrict comparisons to tables matching REGEXP
-  -i,  --tolerant         ignore DEFAULT and formatting changes
+  -i,  --tolerant         ignore DEFAULT, AUTO_INCREMENT, COLLATE, and formatting changes
 
   -h,  --host=...         connect to host
   -P,  --port=...         use this port for connection
@@ -89,11 +80,11 @@ Options:
   -s,  --socket=...       socket to use when connecting to server
 
 for <databaseN> only, where N == 1 or 2,
-  -hN, --hostN=...        connect to host
-  -PN, --portN=...        use this port for connection
-  -uN, --userN=...        user for login if not current user
-  -pN, --passwordN[=...]  password to use when connecting to server
-  -sN, --socketN=...      socket to use when connecting to server
+       --hostN=...        connect to host
+       --portN=...        use this port for connection
+       --userN=...        user for login if not current user
+       --passwordN[=...]  password to use when connecting to server
+       --socketN=...      socket to use when connecting to server
 
 Databases can be either files or database names.
 If there is an ambiguity, the file will be preferred;
@@ -102,15 +93,15 @@ EOF
 }
 
 sub apply {
-  my ($diffs) = @_;
+  my ($md, $diffs) = @_;
 
   if (! $diffs) {
     print "No differences to apply.\n";
-    exit 0;
+    return;
   }
 
-  my $db0  = $db[0]->name;
-  if ($db[0]->source_type ne 'db') {
+  my $db0 = $md->db1->name;
+  if ($md->db1->source_type ne 'db') {
     die "$db0 is not a database; cannot apply changes.\n";
   }
 
@@ -123,12 +114,11 @@ sub apply {
   }
 
   print "Applying changes ... ";
-  my $args = $db[0]->auth_args;
+  my $args = $md->db1->auth_args;
   my $pipe = "mysql$args $db0";
-  open(PATCH, "|$pipe")
-    or die "Couldn't open pipe to '$pipe': $!\n";
-  print PATCH $diffs;
-  close(PATCH) or die "Couldn't close pipe: $!\n";
+  my $fh = IO::File->new("|$pipe") or die "Couldn't open pipe to '$pipe': $!\n";
+  print $fh $diffs;
+  $fh->close or die "Couldn't close pipe: $!\n";
   print "done.\n";
 }
 

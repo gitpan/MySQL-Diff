@@ -2,9 +2,13 @@
 
 use strict;
 
-use Test;
-use MySQL::Database;
-use MySQL::Diff qw(diff_dbs);
+use Test::More;
+use MySQL::Diff;
+use MySQL::Diff::Database;
+
+my $TEST_USER = 'test';
+my @VALID_ENGINES = qw(MyISAM InnoDB);
+my $VALID_ENGINES = join '|', @VALID_ENGINES;
 
 my %tables = (
   foo1 => '
@@ -100,8 +104,8 @@ CREATE TABLE baz (
 ',
 );
 
-my @tests = (
-  'add column',
+my %tests = (
+  'add column' =>
   [
     {},
     @tables{qw/foo1 foo2/},
@@ -116,7 +120,7 @@ ALTER TABLE foo ADD COLUMN field blob;
 ',
   ],
   
-  'drop column',
+  'drop column' =>
   [
     {},
     @tables{qw/foo2 foo1/},
@@ -131,7 +135,7 @@ ALTER TABLE foo DROP COLUMN field; # was blob
 ',
   ],
 
-  'change column',
+  'change column' =>
   [
     {},
     @tables{qw/foo2 foo3/},
@@ -146,7 +150,7 @@ ALTER TABLE foo CHANGE COLUMN field field tinyblob; # was blob
 '
   ],
 
-  'no-old-defs',
+  'no-old-defs' =>
   [
     { 'no-old-defs' => 1 },
     @tables{qw/foo2 foo1/},
@@ -162,7 +166,7 @@ ALTER TABLE foo DROP COLUMN field;
 ',
   ],
 
-  'add table',
+  'add table' =>
   [
     { },
     $tables{foo1}, $tables{foo2} . $tables{bar1},
@@ -180,13 +184,13 @@ CREATE TABLE bar (
   utime datetime default NULL,
   name char(16) default NULL,
   age int(11) default NULL,
-  PRIMARY KEY  (id)
-) TYPE=MyISAM;
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 ',
   ],
 
-  'drop table',
+  'drop table' =>
   [
     { },
     $tables{foo1} . $tables{bar1}, $tables{foo2},
@@ -203,7 +207,7 @@ ALTER TABLE foo ADD COLUMN field blob;
 ',
   ],
 
-  'only-both',
+  'only-both' =>
   [
     { 'only-both' => 1 },
     $tables{foo1} . $tables{bar1}, $tables{foo2},
@@ -219,7 +223,7 @@ ALTER TABLE foo ADD COLUMN field blob;
 ',
   ],
 
-  'keep-old-tables',
+  'keep-old-tables' =>
   [
     { 'keep-old-tables' => 1 },
     $tables{foo1} . $tables{bar1}, $tables{foo2},
@@ -235,7 +239,7 @@ ALTER TABLE foo ADD COLUMN field blob;
 ',
   ],
 
-  'table-re',
+  'table-re' =>
   [
     { 'table-re' => 'ba' },
     $tables{foo1} . $tables{bar1} . $tables{baz1},
@@ -253,7 +257,7 @@ ALTER TABLE baz ADD UNIQUE firstname (firstname,surname);
 ',
   ],
 
-  'drop primary key with auto weirdness',
+  'drop primary key with auto weirdness' =>
   [
     {},
     $tables{foo3},
@@ -272,6 +276,7 @@ ALTER TABLE foo DROP INDEX id;
 ',
   ],
       
+  'drop additional primary key' =>
   [
     {},
     $tables{foo4},
@@ -290,7 +295,7 @@ ALTER TABLE foo DROP INDEX id;
 ',
   ],
 
-  'unique changes',
+  'unique changes' =>
   [
     {},
     $tables{bar1},
@@ -306,6 +311,7 @@ ALTER TABLE bar ADD UNIQUE name (name,age);
 ',
   ],
       
+  'drop index' =>
   [
     {},
     $tables{bar2},
@@ -321,6 +327,7 @@ ALTER TABLE bar DROP INDEX name; # was UNIQUE (name,age)
 ',
   ],
       
+  'alter indices' =>
   [
     {},
     $tables{bar2},
@@ -337,6 +344,7 @@ ALTER TABLE bar ADD UNIQUE id (id,name,age);
 ',
   ],
 
+  'alter indices 2' =>
   [
     {},
     $tables{bar3},
@@ -353,6 +361,7 @@ ALTER TABLE bar ADD UNIQUE name (name,age);
 ',
   ],
 
+  'add unique index' =>
   [
     {},
     $tables{bar1},
@@ -368,6 +377,7 @@ ALTER TABLE bar ADD UNIQUE id (id,name,age);
 ',
   ],
 
+  'drop unique index' =>
   [
     {},
     $tables{bar3},
@@ -383,6 +393,7 @@ ALTER TABLE bar DROP INDEX id; # was UNIQUE (id,name,age)
 ',
   ],
 
+  'alter unique index' =>
   [
     {},
     $tables{baz2},
@@ -399,6 +410,7 @@ ALTER TABLE baz ADD INDEX firstname (firstname,surname);
 ',
   ],
 
+  'alter unique index 2' =>
   [
     {},
     $tables{baz3},
@@ -416,85 +428,127 @@ ALTER TABLE baz ADD UNIQUE firstname (firstname,surname);
   ],
 );
 
-my $run = 0;
-my $total = scalar(grep ref, @tests) * 2 + 4;
+my $BAIL = check_setup();
+plan skip_all => $BAIL  if($BAIL);
+
+my $total = scalar(keys %tests) * 5;
 plan tests => $total;
 
-print "# Test loading MySQL::Diff\n";
-my_ok(1);
+use Data::Dumper;
 
-print "# Test can run mysql client\n";
-my $client_ok = (open(MYSQL, "mysql --help|") &&
-                   join('', <MYSQL>) =~ /net_buffer_length/);
-bail("Cannot proceed with tests without a mysql client")
-  unless $client_ok;
-my_ok($client_ok);
+my @tests = (keys %tests); #keys %tests
 
-print "# Test can run mysqldump utility\n";
-my $mysqldump_ok = (open(MYSQLDUMP, "mysqldump --help|") &&
-                      join('', <MYSQLDUMP>) =~ /net_buffer_length/);
-bail("Cannot proceed with tests without mysqldump")
-  unless $mysqldump_ok;
-my_ok($mysqldump_ok);
+{
+    my %debug = ( debug_file => 'debug.log', debug => 9 );
+    unlink $debug{debug_file};
 
-print "# Test can connect to mysql db\n";
-my $connection_ok = (open(MYSQL, "echo status | mysql 2>&1 |") &&
-                       join('', <MYSQL>) =~ /Connection id:/i);
-bail("Cannot proceed with tests without a valid connection")
-  unless $connection_ok;
-my_ok($connection_ok);
+    for my $test (@tests) {
+      note( "Testing $test\n" );
 
-foreach my $test (@tests) {
-  if (! ref $test) {
-    print "# Testing $test\n";
-    next;
-  }
+      my ($opts, $db1_defs, $db2_defs, $expected) = @{$tests{$test}};
 
-  my ($opts, $db1_defs, $db2_defs, $expected) = @$test;
+      note("test=".Dumper($tests{$test}));
 
-  my $db1 = get_db($db1_defs, 1);
-  my $db2 = get_db($db2_defs, 2);
+      my $diff = MySQL::Diff->new(%$opts, %debug);
+      isa_ok($diff,'MySQL::Diff');
 
-  my $diffs = diff_dbs($opts, $db1, $db2);
-  $diffs =~ s/^## mysqldiff [\d.]+/## mysqldiff <VERSION>/m;
-  $diffs =~ s/^## Run on .*/## Run on <DATE>/m;
-  $diffs =~ s{/\*!40000 ALTER TABLE .* DISABLE KEYS \*/;\n*}{}m;
-  $diffs =~ s/ *$//gm;
+      my $db1 = get_db($db1_defs, 1);
+      my $db2 = get_db($db2_defs, 2);
 
-  my_ok($diffs, $expected);
+      my $d1 = $diff->register_db($db1, 1);
+      my $d2 = $diff->register_db($db2, 2);
+      note("d1=" . Dumper($d1));
+      note("d2=" . Dumper($d2));
 
-  # Now test that $diffs correctly patches $db1_defs to $db2_defs.
-  my $patched = get_db($db1_defs . "\n" . $diffs, 1);
-  my_ok(diff_dbs($opts, $patched, $db2), '');
+      isa_ok($d1, 'MySQL::Diff::Database');
+      isa_ok($d2, 'MySQL::Diff::Database');
+
+      my $diffs = $diff->diff();
+      $diffs =~ s/^## mysqldiff [\d.]+/## mysqldiff <VERSION>/m;
+      $diffs =~ s/^## Run on .*/## Run on <DATE>/m;
+      $diffs =~ s{/\*!40\d{3} .*? \*/;\n*}{}m;
+      $diffs =~ s/ *$//gm;
+      for ($diffs, $expected) {
+        s/ default\b/ DEFAULT/gi;
+        s/PRIMARY KEY +\(/PRIMARY KEY (/g;
+        s/auto_increment/AUTO_INCREMENT/gi;
+      }
+
+      my $engine = 'InnoDB';
+      my $ENGINE_RE = qr/ENGINE=($VALID_ENGINES)/;
+      if ($diffs =~ $ENGINE_RE) {
+        $engine = $1;
+        $expected =~ s/$ENGINE_RE/ENGINE=$engine/g;
+      }
+
+      note("diffs = "    . Dumper($diffs));
+      note("expected = " . Dumper($expected));
+
+      is_deeply($diffs, $expected, ".. expected differences for $test");
+
+      # Now test that $diffs correctly patches $db1_defs to $db2_defs.
+      my $patched = get_db($db1_defs . "\n" . $diffs, 1);
+      $diff->register_db($patched, 1);
+      is_deeply($diff->diff(), '', ".. patched differences for $test");
+    }
 }
+
 
 sub get_db {
-  my ($defs, $num) = @_;
+    my ($defs, $num) = @_;
 
-  my $file = "tmp.db$num";
-  open(TMP, ">$file") or die "open: $!";
-  print TMP $defs;
-  close(TMP);
-  my $db = MySQL::Database->new(file => $file);
-  unlink $file;
-  return $db;
+    note("defs=$defs");
+
+    my $file = "tmp.db$num";
+    open(TMP, ">$file") or die "open: $!";
+    print TMP $defs;
+    close(TMP);
+    my $db = MySQL::Diff::Database->new(file => $file, auth => { user => $TEST_USER });
+    unlink $file;
+    return $db;
 }
 
-sub my_ok { # do we really need this?
-  $run++;
-  &ok;
+sub check_setup {
+    my $failure_string = "Cannot proceed with tests without ";
+    _output_matches("mysql --help", qr/--password/) or
+        return $failure_string . 'a MySQL client';
+    _output_matches("mysqldump --help", qr/--password/) or
+        return $failure_string . 'mysqldump';
+    _output_matches("echo status | mysql -u $TEST_USER 2>&1", qr/Connection id:/) or
+        return $failure_string . 'a valid connection';
+    return '';
 }
 
-sub bail { # because Test::More::BAIL_OUT is still unimplemented ...
-  my ($reason) = @_;
-  ok(0);
-  print "$reason.\n";
-  if ($ENV{FAKE_SUCCESS}) {
-    print "FAKE_SUCCESS was set; assuming OK and faking success for rest of tests ...\n";
-    ok(1) for 1 .. ($total - $run);
-  }
-  else {
-    print "Aborting rest of tests.\n";
-  }
-  exit 0;
+sub _output_matches {
+    my ($cmd, $re) = @_;
+    my ($exit, $out) = _run($cmd);
+
+    my $issue;
+    if (defined $exit) {
+        if ($exit == 0) {
+            $issue = "Output from '$cmd' didn't match /$re/:\n$out" if $out !~ $re;
+        }
+        else {
+            $issue = "'$cmd' exited with status code $exit";
+        }
+    }
+    else {
+        $issue = "Failed to execute '$cmd'";
+    }
+
+    if ($issue) {
+        warn $issue, "\n";
+        return 0;
+    }
+    return 1;
+}
+
+sub _run {
+    my ($cmd) = @_;
+    unless (open(CMD, "$cmd|")) {
+        return (undef, "Failed to execute '$cmd': $!\n");
+    }
+    my $out = join '', <CMD>;
+    close(CMD);
+    return ($?, $out);
 }

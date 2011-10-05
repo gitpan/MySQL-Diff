@@ -1,4 +1,4 @@
-2003-05-08  adams  <adams@yoda>
+2003-05-08  Adam Spiers  <mysqldiff@adamspiers.org>
 
 	* README: document bugs
 
@@ -220,7 +220,7 @@
 	- rename 'hack' option to avoid clash
 	- fix --host0 bug
 
-2000-10-16  damian  <damian@yoda>
+2000-10-16  Christof Damian
 
 	* mysqldiff:
 	- hack to be more tolerant
@@ -234,7 +234,7 @@
 
 	* mysqldiff: 0.24
 
-2000-08-31  damian  <damian@yoda>
+2000-08-31  Christof Damian
 
 	* mysqldiff:
 	- change column needs the name of old and new field
