@@ -22,9 +22,8 @@ the second.
 
 use warnings;
 use strict;
-use vars qw($VERSION);
 
-$VERSION = '0.40';
+our $VERSION = '0.41';
 
 # ------------------------------------------------------------------------------
 # Libraries
@@ -33,6 +32,8 @@ use MySQL::Diff::Database;
 use MySQL::Diff::Utils qw(debug debug_level debug_file);
 
 use Data::Dumper;
+
+# ------------------------------------------------------------------------------
 
 =head1 METHODS
 
@@ -459,15 +460,18 @@ sub _debug_level {
 
 __END__
 
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2000-2011 Adam Spiers. All rights reserved. This
+program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+=head1 SEE ALSO
+
+L<mysqldiff>, L<MySQL::Diff::Database>, L<MySQL::Diff::Table>, L<MySQL::Diff::Utils>
+
 =head1 AUTHOR
 
 Adam Spiers <mysqldiff@adamspiers.org>
-
-=head1 COPYRIGHT AND LICENSE
-
-  Copyright (c) 2000-2011 Adam Spiers
-
-  This module is free software; you can redistribute it and/or
-  modify it under the same terms as Perl itself.
 
 =cut

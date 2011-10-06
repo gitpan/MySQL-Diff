@@ -31,15 +31,16 @@ Parses a table definition into component parts.
 
 use warnings;
 use strict;
-use vars qw($VERSION);
 
-$VERSION = '0.40';
+our $VERSION = '0.41';
 
 # ------------------------------------------------------------------------------
 # Libraries
 
 use Carp qw(:DEFAULT);
 use MySQL::Diff::Utils qw(debug);
+
+# ------------------------------------------------------------------------------
 
 =head1 METHODS
 
@@ -51,8 +52,6 @@ use MySQL::Diff::Utils qw(debug);
 
 Instantiate the objects, providing the command line options for database
 access and process requirements.
-
-=back
 
 =cut
 
@@ -69,6 +68,8 @@ sub new {
     $self->_parse;
     return $self;
 }
+
+=back
 
 =head2 Public Methods
 
@@ -232,15 +233,18 @@ sub _parse {
 
 __END__
 
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2000-2011 Adam Spiers. All rights reserved. This
+program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+=head1 SEE ALSO
+
+L<mysqldiff>, L<MySQL::Diff>, L<MySQL::Diff::Database>, L<MySQL::Diff::Utils>
+
 =head1 AUTHOR
 
 Adam Spiers <mysqldiff@adamspiers.org>
-
-=head1 COPYRIGHT AND LICENSE
-
-  Copyright (c) 2000-2011 Adam Spiers
-
-  This module is free software; you can redistribute it and/or
-  modify it under the same terms as Perl itself.
 
 =cut

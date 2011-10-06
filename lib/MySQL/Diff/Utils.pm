@@ -16,9 +16,8 @@ Currently contains the debug message handling routines.
 
 use warnings;
 use strict;
-use vars qw($VERSION);
 
-$VERSION = '0.40';
+our $VERSION = '0.41';
 
 # ------------------------------------------------------------------------------
 # Libraries
@@ -29,8 +28,9 @@ use IO::File;
 # Export Components
 
 use base qw(Exporter);
-use vars qw(@EXPORT_OK);
-@EXPORT_OK = qw(debug_file debug_level debug);
+our @EXPORT_OK = qw(debug_file debug_level debug);
+
+# ------------------------------------------------------------------------------
 
 =head1 FUNCTIONS
 
@@ -97,15 +97,18 @@ is equal to or lower than the current debug level.
 
 __END__
 
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2000-2011 Adam Spiers. All rights reserved. This
+program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+=head1 SEE ALSO
+
+L<mysqldiff>, L<MySQL::Diff>, L<MySQL::Diff::Database>, L<MySQL::Diff::Table>
+
 =head1 AUTHOR
 
 Adam Spiers <mysqldiff@adamspiers.org>
-
-=head1 COPYRIGHT AND LICENSE
-
-  Copyright (c) 2000-2011 Adam Spiers
-
-  This module is free software; you can redistribute it and/or
-  modify it under the same terms as Perl itself.
 
 =cut
